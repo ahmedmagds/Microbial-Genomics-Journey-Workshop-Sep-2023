@@ -1,8 +1,5 @@
 # MGJW Problem Set 2
 
-## Kahoot
-Let's test what we learnt last session [here](https://play.kahoot.it/v2/?quizId=b42d290a-be13-436d-80a7-de78873a50c5).
-
 ## Part 1
 * Try this command to list all environments installed on your computer (conda info --envs)
 * Try this command to list all packages installed in the mash environment (conda list -n mash)
