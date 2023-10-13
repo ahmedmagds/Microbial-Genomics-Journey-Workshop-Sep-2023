@@ -5,7 +5,7 @@
 [Busco by Erin Theiller](BUSCO.md)
 
 ## Reproducibility
-[Reproducibility by Daniel P. Morreale](Reproducability.md)
+[Reproducibility by Daniel P. Morreale](Reproducibility.md)
 
 ## Contamination
 Figure showing the concepts!
