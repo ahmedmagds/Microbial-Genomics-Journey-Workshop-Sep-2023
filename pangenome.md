@@ -24,6 +24,7 @@ Here are some examples of how the pangenome has been used in research:
 ## Roary
 [Roary](http://sanger-pathogens.github.io/Roary/) is a tool designed to quickly build large-scale pan genomes for prokaryote populations, consisting of hundreds or thousands of isolates. It identifies core and accessory genes, enabling researchers to gain insights into the genetic structure of prokaryotic genomes. Roary can allow efficient analysis on a standard desktop without sacrificing accuracy. It will give different outputs which can be explored and understood from the explanation available from roary website.
 
+### Conda:
 ```
 conda activate roary
 cd ~/MGJW
@@ -31,12 +32,65 @@ mkdir roary_results
 cd roary_results
 roary ../gff/*.gff
 ```
+**gff files and folder are available in the problem set 6 dataset**
+
+### Docker:
+#### Pull the docker image
+```
+docker pull qianxuanshe/mgjw-sep2023-s7:latest
+```
+#### Run the docker image
+```
+docker run -it qianxuanshe/mgjw-sep2023-s7
+```
+#### Make the directory for roary output, and go to the directory
+```
+mkdir roary_results
+cd roary_results
+```
+#### Run Roary
+```
+roary ../gff/*.gff
+```
+## Panaroo
+Panaroo(https://gtonkinhill.github.io/panaroo/#/) is a graph based pangenome clustering tool that is able to account for many of the sources of error introduced during the annotation of prokaryotic genome assemblies.
+
+### Docker:
+#### Pull the docker image
+```
+docker pull qianxuanshe/mgjw-sep2023-s7-panaroo:latest
+```
+#### Run the docker image
+```
+docker run -it qianxuanshe/mgjw-sep2023-s7-panaroo
+```
+#### Make the directory for panaroo output
+```
+mkdir panaroo_results
+```
+
+#### Run Panaroo
+```
+panaroo -i /session7/gff/*.gff -o panaroo_results --clean-mode strict
+```
 
 ## Scoary
 [Scoary](https://github.com/AdmiralenOla/Scoary) is a tool that uses Roary's gene_presence_absence.csv file and a user-created traits file to calculate associations between accessory genome genes and traits. It generates a list of genes ranked by the strength of association for each trait.
+### Conda:
 ```
 scoary -p 1 -g op_roary/gene_presence_absence.csv -t traits.csv
 ```
+### Docker
+#### Run the same docker image(qianxuanshe/mgjw-sep2023-s7).
+Ignore this step if you don't exit the docker image.
+```
+docker run -it qianxuanshe/mgjw-sep2023-s7
+```
+#### Run Scoary
+```
+scoary -p 1 -g /session7/roary_results/gene_presence_absence.csv -t traits.csv
+```
+
 
 ## Further Readings
 * [roary](https://academic.oup.com/bioinformatics/article/31/22/3691/240757)
