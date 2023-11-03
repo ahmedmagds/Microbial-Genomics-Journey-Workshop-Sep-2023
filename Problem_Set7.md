@@ -13,7 +13,7 @@
 
 ## Get the data.
 #### 1. Download the FASTA formatted sequences of your genomes from NCBI webpage or using a command-line tool (Hint: what about using ncbi-datasets tool?). Create a problem_set_7 directory in your MGJW folder and move these files into that folder.<br/>
-#### Below are the accession numbers:<br/>
+#### Below are the accession numbers if you will use the website:<br/>
 * NC_003112.2
 * NC_017516.1
 * NZ_CP009419.1
@@ -22,6 +22,16 @@
 * NC_017515.1
 * NC_017505.1
 * NC_017512.1
+
+#### Below are the accession numbers if you will use the ncbi-datasets tool:<br/>
+* GCF_000008805.1
+* GCF_000191445.1
+* GCF_000800275.1
+* GCF_001029835.1
+* GCF_000191485.1
+* GCF_000191505.1
+* GCF_000152165.1
+* GCF_000253215.1
 
 ## Part 1 <br/>
 ### Prokka <br/>
