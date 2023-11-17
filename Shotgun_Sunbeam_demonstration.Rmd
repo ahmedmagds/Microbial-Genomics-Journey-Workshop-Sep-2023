@@ -1,0 +1,250 @@
+---
+title: Sunbeam demonstration
+date: \today
+output: 
+  pdf_document:
+    toc: true
+    toc_depth: 3
+---
+
+```{r knitr setup, echo=FALSE, message=FALSE}
+library(knitr)
+opts_chunk$set(
+  tidy=FALSE,
+  cache=FALSE,
+  echo=FALSE,
+  warning=FALSE,
+  message=FALSE,
+  dpi=100,
+  fig.width=5,
+  fig.height=3,
+  fig.align = "center"
+  )
+```
+
+
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(qiimer)
+library(vegan)
+
+library(adonisplus)
+library(pheatbuilder)
+library(ggbeeswarm)
+```
+
+
+```{r}
+data_dir <- "Data"
+
+### rarefying subsample size 
+richness_subsample_size <- 1000
+
+### mapping file path
+mapping_file_fp <- file.path(data_dir, "sample_sheet.tsv")
+
+### preprocess summary results filepath
+preprocess_fp <- file.path(data_dir, "preprocess_summary.tsv")
+
+### taxonomic assignment 
+feature_table_fp <- file.path(data_dir, "all_samples.tsv")
+```
+
+
+```{r sample_sheet_import, echo=FALSE}
+preprocess <- read.delim(preprocess_fp) %>%
+  rename(SampleID = Samples)
+
+s <- read_delim(mapping_file_fp) %>%
+  left_join(preprocess, by="SampleID")
+```
+
+
+```{r}
+o <- read_qiime_otu_table(feature_table_fp)
+
+counts <- o$counts
+colnames(counts) <- sub("\\.taxa$", "", colnames(counts))
+counts <- counts[,s$SampleID]
+
+ta <- o$metadata %>%
+  enframe("Taxid", "Taxon") %>%
+  mutate(Taxon = str_remove(Taxon, "(; [kpcofgs]__)+$")) %>%
+  mutate(Taxon = gsub("[kpcofgs]__", "", Taxon)) 
+
+adf <- split_assignments(ta$Taxon) %>%
+  mutate(Species = ifelse(!is.na(Genus) & !is.na(Species), paste(Genus, Species), NA))
+rownames(adf) <- ta$Taxid
+rm(ta)
+
+is_human <- grepl("Chordata", adf$Phylum)
+is_empty <- rowSums(counts) == 0
+taxa_to_delete = is_human | is_empty
+adf <- adf[!taxa_to_delete,]
+counts <- counts[!taxa_to_delete,]
+rm(is_human, is_empty, taxa_to_delete)
+
+a <- simplify_assignments(adf, rank1 = "Phylum", rank2="Species")
+
+summed_cts <- rowsum(counts, a) 
+summed_props <- sweep(summed_cts, 2, colSums(summed_cts), "/")
+```
+
+```{r alpha}
+richness <- rarefy(t(counts), richness_subsample_size) %>%
+  enframe("SampleID", "Richness")
+  
+shannon <- diversity(t(counts)) %>%
+  enframe("SampleID", "Shannon")
+
+s <- s %>%
+  left_join(richness, by="SampleID") %>%
+  left_join(shannon, by="SampleID")
+
+rm(richness, shannon)
+```
+
+```{r beta}
+bc <- vegdist(t(summed_props))
+jd <- vegdist(t(summed_props), binary = T)
+```
+
+
+
+\newpage
+
+# Demultiplexing and quality control
+
+## Overall distribution of percentage reads removed in quality control
+
+The low quality reads defined by Trimmomatic-0.33 were discarded from further analysis. Host DNA and PhiX DNA were filtered using BWA. Remaining reads were analyzed further.
+
+```{r fig.width=9, fig.height=5}
+s %>%
+  mutate(`low quality` = (input-host-nonhost) / input) %>%
+  mutate(host = host / input) %>%
+  mutate(nonhost = nonhost / input) %>%
+  select(SampleID, sample_type, `low quality`, host, nonhost) %>%
+  mutate(SampleID = reorder(SampleID, host)) %>%
+  pivot_longer(-all_of(c("SampleID", "sample_type")), names_to="category", values_to="percent") %>%
+  mutate(category = fct_relevel(category, "low quality", after=0)) %>%
+  ggplot(aes(x=SampleID, y=percent, fill=category)) +
+    geom_bar(stat="identity") +
+    facet_grid(.~sample_type, space="free", scales="free") +
+    scale_fill_manual(values=c("#808080", "#A6CEE3", "#1F78B4")) + 
+    scale_y_continuous(limits = c(0,1), expand=c(0,0), labels=scales:::percent) +
+    theme_bw() +
+    theme(
+      axis.text.x=element_text(angle=90,hjust=1,vjust=0.5),
+      strip.background = element_blank(),
+      #axis.ticks.x = element_blank()
+      ) +
+    labs(x="", y="Relative abundance", fill="")
+```
+
+
+
+## Taxonomic heatmap
+
+```{r}
+prop_cut <- 0.01
+```
+
+Taxonomic assignments were performed using the Kraken program.
+
+Heatmap charts were generated from the taxonomic assignments. Each column represents one sample and each row represents one taxon (typically a species). Ranks are included in the plot if the taxon is present in `r 100*prop_cut`% mean abundance in at least one sample type.
+
+The chart is colored white if species were not observed in the sample, dark blue if species were observed at very low abundance.  This allows the reader to quickly survey species presence/absence.  Abundance values exceeding 40% are colored red, indicating an extremely dominant species.
+
+
+```{r fig.width=20, fig.height=10}
+s_toPlot <- s %>%
+  select(SampleID, sample_type) %>%
+  arrange(sample_type) %>%
+  droplevels()
+
+# select taxa with mean relative abundance of 1% in at least one sample type
+select_taxa <- summed_props %>%
+  as.data.frame() %>% 
+  rownames_to_column("Taxa") %>% 
+  pivot_longer(-Taxa, names_to="SampleID", values_to="props") %>%
+  right_join(s_toPlot, by="SampleID")  %>%
+  group_by(sample_type, Taxa) %>%
+  mutate(mean_prop = mean(props)) %>%
+  ungroup() %>%
+  group_by(Taxa) %>%
+  mutate(mean_prop = max(mean_prop)) %>%
+  ungroup() %>%
+  filter(mean_prop > prop_cut) %>%
+  pull(Taxa) %>%
+  as.character() %>%
+  unique()
+
+props_toPlot <- summed_props[select_taxa, s_toPlot$SampleID]
+props_toPlot <- summed_props[select_taxa, ]
+props_toPlot %>%
+  pheat() %>%
+  pheat_color_saturated() %>%
+  pheat_cluster_rows() %>%
+  pheat_annotate_cols(s_toPlot)# %>%
+  #pheat_display_cols(gaps = factor_gaps(s_toPlot$sample_type)) 
+```
+
+
+
+## Alpha diversity
+
+Alpha diversity was assessed by the expected number of observed taxa (out of rarefying sample size of `r format(richness_subsample_size, big.mark = ",", scientific = F)`) and Shannon index.
+
+```{r}
+s %>%
+  pivot_longer(c("Richness", "Shannon"), names_to="metric", values_to="alpha") %>%
+  
+  ggplot(aes(x=sample_type, y=alpha)) +
+    geom_boxplot(outlier.alpha = 0) +
+    geom_quasirandom() +
+    facet_wrap(~metric, scales = "free_y") +
+    theme_bw() +
+    theme(
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+      aspect.ratio = 1
+    ) +
+    labs(
+      x="", color="SubjectID", 
+      y="Alpha diversity value"
+    )
+```
+
+
+
+## Beta diversity
+
+
+Here, we use Bray-Curtis and Jaccard distances to compare the species composition of the samples to each other.
+
+The plots below show the distance between each pair of samples in a single 2D plot.  It is not possible to plot the distances exactly on paper, so we have used a method of ordination called Principal Coordinates Analysis to select the best coordinate system for display.  The percentage of total variance captured along each axis is displayed on the chart.
+
+```{r fig.show='hold', out.width='.49\\linewidth', fig.height=3, fig.width=5}
+s %>%
+  pcoaplus(bc) %>%
+  plot(color=sample_type) +
+    theme_bw() +
+    theme(
+      aspect.ratio = 1
+    ) +
+    labs(color="", title="Bray-Curtis")
+
+s %>%
+  pcoaplus(jd) %>%
+  plot(color=sample_type) +
+    theme_bw() +
+    theme(
+      aspect.ratio = 1
+    ) +
+    labs(color="", title="Jaccard")
+```
+
+
+
+
