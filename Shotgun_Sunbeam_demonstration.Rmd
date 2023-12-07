@@ -36,7 +36,7 @@ library(ggbeeswarm)
 
 
 ```{r}
-data_dir <- "Data"
+data_dir <- "."
 
 ### rarefying subsample size 
 richness_subsample_size <- 1000
@@ -158,7 +158,7 @@ Heatmap charts were generated from the taxonomic assignments. Each column repres
 The chart is colored white if species were not observed in the sample, dark blue if species were observed at very low abundance.  This allows the reader to quickly survey species presence/absence.  Abundance values exceeding 40% are colored red, indicating an extremely dominant species.
 
 
-```{r fig.width=20, fig.height=10}
+```{r fig.width=5, fig.height=5}
 s_toPlot <- s %>%
   select(SampleID, sample_type) %>%
   arrange(sample_type) %>%
